@@ -5,9 +5,7 @@ import { canvas, endStroke, moveStroke, startStroke } from './draw';
 const video = document.querySelector('#webcam');
 const landmarkCanvas = document.querySelector('#landmarks');
 const landmarkContext = landmarkCanvas?.getContext('2d');
-let handLandmarker = undefined;
-let isDrawing = false;
-
+const MAX_LOST = 3;
 const handConnections = [
   [0, 1], [1, 2], [2, 3], [3, 4],
   [0, 5], [5, 6], [6, 7], [7, 8],
@@ -17,60 +15,106 @@ const handConnections = [
   [0, 17]
 ];
 
+let handLandmarker = undefined;
+let isDrawing = false;
+let smoothX = null;
+let smoothY = null;
+let lostFrames = 0;
+
 function handleFingerDrawing(results) {
+
+  // no hand
   if (!results || !results.landmarks || results.landmarks.length === 0) {
-    if (isDrawing) {
-      endStroke();
-      isDrawing = false;
+    if (lostFrames >= MAX_LOST) {
+      if (isDrawing) {
+        isDrawing = false;
+        endStroke();
+      }
     }
+
+    smoothX = null;
+    smoothY = null;
+
     return;
   }
+  lostFrames = 0;
+
+  const width = video.videoWidth || canvas.width;
+  const height = video.videoHeight || canvas.height;
 
   const hand = results.landmarks[0];
-  const wrist = hand[0]
+
+  const wrist = hand[0];
   const indexTip = hand[8];
 
+  // ensure landmarks exist
   if (!indexTip || !wrist) {
     if (isDrawing) {
       endStroke();
       isDrawing = false;
     }
+
+    smoothX = null;
+    smoothY = null;
+
     return;
   }
 
-  const distanceFromWrist = Math.hypot(indexTip.x -wrist.x, indexTip.y - wrist.y);
+  const distanceFromWrist = Math.hypot(
+    indexTip.x - wrist.x,
+    indexTip.y - wrist.y
+  );
 
-  // if index fingertip is very close to wrist, treat it as a closed fist and stop drawing.
-  if (distanceFromWrist < 0.18) {
+  // if index pointer is close to wrist, treat as closed fist and stop drawing
+  if (distanceFromWrist < 0.15) {
     if (isDrawing) {
       endStroke();
       isDrawing = false;
     }
+
+    smoothX = null;
+    smoothY = null;
+
     return;
   }
 
-  const width = video.videoWidth || canvas.width;
-  const height = video.videoHeight || canvas.height;
   const x = width - (indexTip.x * width);
   const y = indexTip.y * height;
 
-  const insideCanvas = x >= 0 && x <= canvas.width && y >= 0 && y <= canvas.height;
+  // Smoothing
+  if (smoothX === null) {
+    smoothX = x;
+    smoothY = y;
+  } else {
+    smoothX = smoothX * 0.6 + x * 0.4;
+    smoothY = smoothY * 0.6 + y * 0.4;
+  }
+
+  const insideCanvas =
+    smoothX >= 0 &&
+    smoothX <= canvas.width &&
+    smoothY >= 0 &&
+    smoothY <= canvas.height;
 
   if (!insideCanvas) {
     if (isDrawing) {
       endStroke();
       isDrawing = false;
     }
+
+    smoothX = null;
+    smoothY = null;
+
     return;
   }
 
   if (!isDrawing) {
-    startStroke(x, y);
+    startStroke(smoothX, smoothY);
     isDrawing = true;
     return;
   }
 
-  moveStroke(x, y);
+  moveStroke(smoothX, smoothY);
 }
 
 function drawLandmarks(results) {

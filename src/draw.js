@@ -16,18 +16,16 @@ let isDrawing = false;
 // strokes drawn for all drawing sequences
 const strokes = [];
 
-const colors = document.querySelectorAll('.colorfield');
+const getColor = el => el.type === 'color' ? el.value : el.style.backgroundColor;
 
-colors.forEach(color => {
-  color.addEventListener('click', function() {
-    changeColor(this);
-  });
-});
-
-function changeColor(element) {
-  drawColor = element.style.backgroundColor;
-  isErasing = false;
-}
+// select color depending on element type
+document.querySelectorAll('.colorfield').forEach(el => {
+  const event = el.type === 'color' ? 'input' : 'click';
+  el.addEventListener(event, () => {
+    drawColor = getColor(el);
+    isErasing = false;
+  })
+})
 
 const penRange = document.querySelector('#widthRange');
 penRange.addEventListener('input', (e) => {
@@ -57,6 +55,8 @@ export function startStroke(x, y) {
 
   ctx.beginPath();
   ctx.moveTo(x, y);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
   ctx.lineWidth = width;
   ctx.strokeStyle = color;
   ctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over';
