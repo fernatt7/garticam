@@ -1,5 +1,5 @@
-import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 import './style.css';
+import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 import { canvas, endStroke, moveStroke, startStroke } from './draw';
 
 const video = document.querySelector('#webcam');
@@ -19,9 +19,9 @@ const handConnections = [
 
 function handleFingerDrawing(results) {
   if (!results || !results.landmarks || results.landmarks.length === 0) {
-    if (isDrawing) {
-      endStroke();
-      isDrawing = false;
+    if (isDrawing){
+        endStroke();
+        isDrawing = false;
     }
     return;
   }
@@ -109,7 +109,7 @@ async function createHandLandmarker() {
   handLandmarker = await HandLandmarker.createFromOptions(vision, {
     baseOptions: {
       modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
-      delegate: 'CPU'
+      delegate: 'GPU'
     },
     runningMode: 'VIDEO',
     numHands: 2

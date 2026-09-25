@@ -7,7 +7,27 @@
     <title>garticam</title>
   </head>
   <body>
-    <div id="app"></div>
+
+    <div id="app" class="container">
+      <div class="video-wrap">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="landmarks" width="640" height="480"></canvas>
+        <canvas id="canvas" width="640" height="480"></canvas>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <button id="undo">Undo</button>
+      <button id="clear">Clear</button>
+
+      <div class="colorfield" style="background: red;"></div>
+      <div class="colorfield" style="background: green;"></div>
+      <div class="colorfield" style="background: blue;"></div>
+      <div class="colorfield" style="background: yellow;"></div>
+
+      <button id="eraser">Eraser</button>
+    </div>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
