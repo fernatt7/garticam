@@ -19,17 +19,29 @@ const handConnections = [
 
 function handleFingerDrawing(results) {
   if (!results || !results.landmarks || results.landmarks.length === 0) {
-    if (isDrawing){
-        endStroke();
-        isDrawing = false;
+    if (isDrawing) {
+      endStroke();
+      isDrawing = false;
     }
     return;
   }
 
   const hand = results.landmarks[0];
+  const wrist = hand[0]
   const indexTip = hand[8];
 
-  if (!indexTip) {
+  if (!indexTip || !wrist) {
+    if (isDrawing) {
+      endStroke();
+      isDrawing = false;
+    }
+    return;
+  }
+
+  const distanceFromWrist = Math.hypot(indexTip.x -wrist.x, indexTip.y - wrist.y);
+
+  // if index fingertip is very close to wrist, treat it as a closed fist and stop drawing.
+  if (distanceFromWrist < 0.18) {
     if (isDrawing) {
       endStroke();
       isDrawing = false;

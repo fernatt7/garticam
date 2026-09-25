@@ -8,8 +8,8 @@ canvas.height = 480;
 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
 let drawColor = 'black';
-let drawWidth = 2;
-let eraseWidth = 6;
+let drawWidth = 5;
+let eraseWidth = 10;
 let isErasing = false;
 let isDrawing = false;
 
@@ -28,6 +28,12 @@ function changeColor(element) {
   drawColor = element.style.backgroundColor;
   isErasing = false;
 }
+
+const penRange = document.querySelector('#widthRange');
+penRange.addEventListener('input', (e) => {
+    drawWidth = Number(e.target.value);
+    eraseWidth = Number(e.target.value);
+})
 
 function currentStyle() {
   return isErasing

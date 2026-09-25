@@ -19,13 +19,15 @@
     <div class="toolbar">
       <button id="undo">Undo</button>
       <button id="clear">Clear</button>
+      <button id="eraser">Eraser</button>
 
       <div class="colorfield" style="background: red;"></div>
       <div class="colorfield" style="background: green;"></div>
       <div class="colorfield" style="background: blue;"></div>
       <div class="colorfield" style="background: yellow;"></div>
 
-      <button id="eraser">Eraser</button>
+      <input id="widthRange" type="range" min="2" max="40" oninput="drawWidth = this.value"> 
+
     </div>
 
     <script type="module" src="/src/main.js"></script>
