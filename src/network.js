@@ -3,67 +3,85 @@ import { Peer } from 'peerjs';
 
 const peer = new Peer();
 let conn = null;
+const myId = document.getElementById('my-id');
+const peerIdInput = document.getElementById('peer-id');
+const connectButton = document.getElementById('connect-btn');
+const networkStatus = document.getElementById('network-status');
+let nextMessageId = 0;
 
-const strokes = {
-    color:"red",
-    width:10,
-    x:200,
-    y:220
+function setStatus(message) {
+    if (networkStatus) networkStatus.textContent = message;
 }
 
 // open happened when we have connected to signalling server (server not client) and we get our id back
 peer.on("open", (id) => {
-    document.getElementById("my-id").textContent = id;
+    if (myId) myId.textContent = id;
+    setStatus('Ready to connect');
 });
 
-function setConnection(conn){
-    conn.on("open", () => {
-        console.log("connected!");
+function isValidPoint(point) {
+    return point && Number.isFinite(point.x) && Number.isFinite(point.y) &&
+        point.x >= 0 && point.x <= 640 && point.y >= 0 && point.y <= 480;
+}
+
+function handleStrokeMessage(message) {
+    if (!message || typeof message !== 'object' || typeof message.strokeId !== 'string') return;
+
+    if (message.type === 'stroke-start') {
+        if (!isValidPoint(message.point) || !Number.isFinite(message.width) ||
+                message.width < 1 || message.width > 80 || typeof message.color !== 'string') return;
+    } else if (message.type === 'stroke-point') {
+        if (!isValidPoint(message.point)) return;
+    } else if (message.type !== 'stroke-end') {
+        return;
+    }
+
+    window.dispatchEvent(new CustomEvent('garticam:remote-stroke', { detail: message }));
+}
+
+function setConnection(connection) {
+    conn = connection;
+
+    connection.on('open', () => {
+        setStatus(`Connected to ${connection.peer}`);
     });
 
-    conn.on("data", data => {
-        console.log("COLOR: ", data.color);
-        console.log("WIDTH: ", data.width);
-        console.log("X: ", data.x);
-        console.log("Y: ", data.y);
+    connection.on('data', handleStrokeMessage);
 
-    })
+    connection.on('close', () => {
+        if (conn === connection) conn = null;
+        setStatus('Peer disconnected');
+    });
+
+    connection.on('error', (error) => {
+        console.error('Peer connection error:', error);
+        setStatus('Connection error');
+    });
 }
 
 // connect button clicked => get the other peer-id and try to establish connection
-document.getElementById("connect-btn").addEventListener(
-    "click",
-    () => {
-        const otherPeerId =
-            document.getElementById("peer-id").value;
-
-        // establish connection to other peer
-        conn = peer.connect(otherPeerId);
-
-        // if succesful print connected in console
-        setConnection(conn);
+connectButton?.addEventListener('click', () => {
+    const otherPeerId = peerIdInput?.value.trim();
+    if (!otherPeerId) {
+        setStatus('Enter a peer ID');
+        return;
     }
-);
 
-// detect incoming connection
-peer.on("connection", (incomingConnection) => {
-    conn = incomingConnection;
-    
-    setConnection(conn);
+    setStatus('Connecting...');
+    setConnection(peer.connect(otherPeerId, { reliable: true }));
 });
 
-document.getElementById("send-btn").addEventListener(
-    "click",
-    () => {
-        const message = strokes;
+// detect incoming connection
+peer.on('connection', (incomingConnection) => {
+    setConnection(incomingConnection);
+});
 
-        // only send when there is connection
-        if (conn === null) {
-            console.log("Not connected!");
-            return;
-        }
+peer.on('error', (error) => {
+    console.error('Peer signaling error:', error);
+    setStatus('Signaling error');
+});
 
-        console.log("sent:", message);
-        conn.send(message);
-    }
-);
+export function sendStrokeEvent(message) {
+    if (!conn || !conn.open) return;
+    conn.send({ ...message, messageId: ++nextMessageId });
+}

@@ -13,6 +13,7 @@
         <video id="webcam" autoplay playsinline></video>
         <canvas id="landmarks" width="640" height="480"></canvas>
         <canvas id="canvas" width="640" height="480"></canvas>
+
         <div id="pointer-effects" aria-hidden="true">
           <span class="trail-dot"></span>
           <span class="trail-dot"></span>
@@ -22,7 +23,13 @@
           <span class="trail-dot"></span>
           <span class="finger-glow"></span>
         </div>
+
         <div id="mode-status" aria-live="polite">DRAWING ON</div>
+        <div id="tool-status" aria-live="polite">
+          <span id="tool-color" aria-hidden="true"></span>
+          <span id="tool-color-name">Color: black</span>
+          <span id="tool-width">Width: 5 px</span>
+        </div>
 
         <div class="toolbar">
           <button id="undo" type="button">Undo</button>
@@ -39,6 +46,13 @@
           <input id="widthRange" type="range" min="2" max="40" value="5" aria-label="Brush size">
         </div>
       </div>
+    </div>
+
+    <div class="network-panel">
+      <label>Your ID <code id="my-id">Connecting...</code></label>
+      <input id="peer-id" placeholder="Other peer ID" aria-label="Other peer ID">
+      <button id="connect-btn" type="button">Connect</button>
+      <span id="network-status" role="status">Starting PeerJS...</span>
     </div>
 
     <script type="module" src="/src/main.js"></script>
