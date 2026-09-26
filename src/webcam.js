@@ -4,13 +4,13 @@ import { canvas, endStroke, moveStroke, startStroke, updateToolbarHover } from '
 
 const video = document.querySelector('#webcam');
 const videoWrap = document.querySelector('.video-wrap');
+const cameraSource = document.querySelector('.camera-source');
 const landmarkCanvas = document.querySelector('#landmarks');
 const landmarkContext = landmarkCanvas?.getContext('2d');
 const pointerEffects = document.querySelector('#pointer-effects');
 const fingerGlow = pointerEffects?.querySelector('.finger-glow');
 const trailDots = pointerEffects ? [...pointerEffects.querySelectorAll('.trail-dot')] : [];
 const modeStatus = document.querySelector('#mode-status');
-const MAX_LOST = 5;
 const handConnections = [
   [0, 1], [1, 2], [2, 3], [3, 4],
   [0, 5], [5, 6], [6, 7], [7, 8],
@@ -27,7 +27,6 @@ let phonePaused = false;
 let pinchActive = false;
 let smoothX = null;
 let smoothY = null;
-let lostFrames = 0;
 let drawingReadyAt = null;
 let phoneGestureFrames = 0;
 let phoneGestureReleaseFrames = 0;
@@ -52,9 +51,10 @@ function updateFingerIndicator(x, y, visible) {
     return;
   }
 
+  const viewPoint = mapTrackingPointToView(x, y);
   const bounds = videoWrap.getBoundingClientRect();
-  const screenX = (x / canvas.width) * bounds.width;
-  const screenY = (y / canvas.height) * bounds.height;
+  const screenX = viewPoint.x - bounds.left;
+  const screenY = viewPoint.y - bounds.top;
   pointerEffects.classList.add('visible');
   fingerGlow.style.left = `${screenX}px`;
   fingerGlow.style.top = `${screenY}px`;
@@ -74,8 +74,28 @@ function updateFingerIndicator(x, y, visible) {
   }
 }
 
+function mapTrackingPointToView(x, y) {
+  const sourceBounds = cameraSource.getBoundingClientRect();
+  return {
+    x: sourceBounds.left + (x / canvas.width) * sourceBounds.width,
+    y: sourceBounds.top + (y / canvas.height) * sourceBounds.height
+  };
+}
+
 function distanceBetween(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
+  return Math.hypot(a.x - b.x, a.y - b.y, (a.z ?? 0) - (b.z ?? 0));
+}
+
+function isIndexFingerExtended(hand) {
+  const mcp = hand[5];
+  const pip = hand[6];
+  const tip = hand[8];
+
+  if (!mcp || !pip || !tip) return false;
+
+  // Compare the fingertip-to-base span with one finger-bone length.
+  // Unlike a wrist-distance threshold, this works when pointing up, down, or sideways.
+  return distanceBetween(tip, mcp) > distanceBetween(pip, mcp) * 1.25;
 }
 
 function isPhoneGesture(hand) {
@@ -98,22 +118,17 @@ function setDrawingPaused(paused) {
 }
 
 function handleFingerDrawing(results) {
-  // missing hands end a stroke after a few frames
+  // close immediately so a returning hand always begins a fresh stroke segment.
   if (!results || !results.landmarks || results.landmarks.length === 0) {
-    lostFrames++;
+    stopCurrentStroke();
     drawingReadyAt = null;
     updateToolbarHover(0, 0, false);
     updateFingerIndicator(0, 0, false);
-
-    if (lostFrames >= MAX_LOST) {
-      stopCurrentStroke();
-    }
     smoothX = null;
     smoothY = null;
     return;
   }
 
-  lostFrames = 0;
   const hand = results.landmarks[0];
   const wrist = hand[0];
   const indexTip = hand[8];
@@ -154,13 +169,27 @@ function handleFingerDrawing(results) {
 
   const x = (1 - indexTip.x) * canvas.width;
   const y = indexTip.y * canvas.height;
+  const fingertipInsideCanvas =
+    x >= 0 && x <= canvas.width && y >= 0 && y <= canvas.height;
+
+  if (!fingertipInsideCanvas) {
+    stopCurrentStroke();
+    drawingReadyAt = null;
+    updateToolbarHover(0, 0, false);
+    updateFingerIndicator(0, 0, false);
+    smoothX = null;
+    smoothY = null;
+    return;
+  }
+
   const thumbTip = hand[4];
   const indexBase = hand[5];
   const pinkyBase = hand[17];
   const palmWidth = distanceBetween(indexBase, pinkyBase);
   const pinchDistance = thumbTip ? distanceBetween(indexTip, thumbTip) : Infinity;
-  pinchActive = palmWidth > 0 && pinchDistance < palmWidth * 0.22;
-  const indexIsExtended = distanceBetween(indexTip, wrist) >= 0.25;
+  const pinchThreshold = pinchActive ? 0.8 : 0.65;
+  pinchActive = palmWidth > 0 && pinchDistance < palmWidth * pinchThreshold;
+  const indexIsExtended = isIndexFingerExtended(hand);
 
   if (pinchActive) {
     setDrawingPaused(true);
@@ -173,10 +202,10 @@ function handleFingerDrawing(results) {
 
   setDrawingPaused(phonePaused);
 
-  const bounds = videoWrap.getBoundingClientRect();
-  const clientX = bounds.left + (x / canvas.width) * bounds.width;
-  const clientY = bounds.top + (y / canvas.height) * bounds.height;
-  const hoveringToolbar = updateToolbarHover(clientX, clientY, indexIsExtended);
+  const viewPoint = mapTrackingPointToView(x, y);
+  const clientX = viewPoint.x;
+  const clientY = viewPoint.y;
+  const hoveringToolbar = updateToolbarHover(clientX, clientY, true);
 
   if (hoveringToolbar || drawingPaused) {
     stopCurrentStroke();
@@ -301,6 +330,7 @@ function predictWebcam() {
   const startTimeMs = performance.now();
   const results = handLandmarker.detectForVideo(video, startTimeMs);
 
+  drawLandmarks(results);
   handleFingerDrawing(results);
 }
 
@@ -311,9 +341,22 @@ export async function startCamera() {
   }
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 1280 },
+        height: { ideal: 960 },
+        aspectRatio: { ideal: 4 / 3 }
+      }
+    });
     video.srcObject = stream;
     await video.play();
+
+    const captureSettings = stream.getVideoTracks()[0]?.getSettings();
+    console.info('Webcam capture:', captureSettings?.width, 'x', captureSettings?.height);
+
+    if (video.videoWidth && video.videoHeight) {
+      cameraSource.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+    }
 
     await createHandLandmarker();
     predictWebcam();

@@ -10,9 +10,11 @@
 
     <div id="app" class="container">
       <div class="video-wrap">
-        <video id="webcam" autoplay playsinline></video>
-        <canvas id="landmarks" width="640" height="480"></canvas>
-        <canvas id="canvas" width="640" height="480"></canvas>
+        <div class="camera-source">
+          <video id="webcam" autoplay playsinline></video>
+          <canvas id="landmarks" width="640" height="480"></canvas>
+          <canvas id="canvas" width="640" height="480"></canvas>
+        </div>
 
         <div id="pointer-effects" aria-hidden="true">
           <span class="trail-dot"></span>

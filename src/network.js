@@ -13,7 +13,6 @@ function setStatus(message) {
     if (networkStatus) networkStatus.textContent = message;
 }
 
-// open happened when we have connected to signalling server (server not client) and we get our id back
 peer.on("open", (id) => {
     if (myId) myId.textContent = id;
     setStatus('Ready to connect');

@@ -92,13 +92,25 @@ p {
 .video-wrap {
   position: relative;
   width: min(92vw, 960px);
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   background: #171a1d;
 }
 
-.video-wrap video,
-.video-wrap canvas {
+.camera-source {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  --tracking-zoom: 1.18;
+  --tracking-origin-y: 65%;
+  transform: translate(-50%, -50%) scale(var(--tracking-zoom));
+  transform-origin: 50% var(--tracking-origin-y);
+}
+
+.camera-source video,
+.camera-source canvas {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -106,13 +118,14 @@ p {
   object-fit: fill;
 }
 
+.camera-source video {
+  transform: scaleX(-1);
+  transform-origin: center;
+}
+
 #landmarks {
   pointer-events: none;
   z-index: 1;
-}
-
-video {
-  transform: scaleX(-1);
 }
 
 #canvas {
@@ -131,10 +144,12 @@ video {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   width: max-content;
   max-width: calc(100% - 24px);
+  overflow-x: auto;
+  scrollbar-width: thin;
   padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 8px;
