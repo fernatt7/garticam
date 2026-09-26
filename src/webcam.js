@@ -1,6 +1,7 @@
 import './style.css';
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 import { canvas, endStroke, moveStroke, startStroke, updateToolbarHover } from './draw.js';
+import { isLocalDrawer, setLocalStream } from './network.js';
 
 const video = document.querySelector('#webcam');
 const videoWrap = document.querySelector('.video-wrap');
@@ -118,6 +119,15 @@ function setDrawingPaused(paused) {
 }
 
 function handleFingerDrawing(results) {
+  if (!isLocalDrawer()) {
+    stopCurrentStroke();
+    drawingReadyAt = null;
+    updateFingerIndicator(0, 0, false);
+    smoothX = null;
+    smoothY = null;
+    return;
+  }
+
   // close immediately so a returning hand always begins a fresh stroke segment.
   if (!results || !results.landmarks || results.landmarks.length === 0) {
     stopCurrentStroke();
@@ -330,7 +340,6 @@ function predictWebcam() {
   const startTimeMs = performance.now();
   const results = handLandmarker.detectForVideo(video, startTimeMs);
 
-  drawLandmarks(results);
   handleFingerDrawing(results);
 }
 
@@ -349,6 +358,7 @@ export async function startCamera() {
       }
     });
     video.srcObject = stream;
+    setLocalStream(stream);
     await video.play();
 
     const captureSettings = stream.getVideoTracks()[0]?.getSettings();

@@ -1,5 +1,5 @@
 import './style.css';
-import { sendStrokeEvent } from './network.js';
+import { isLocalDrawer, sendStrokeEvent } from './network.js';
 
 const canvas = document.querySelector('#canvas');
 const ctx = canvas.getContext('2d');
@@ -128,6 +128,8 @@ function currentStyle() {
 
 // start drawing sequence
 export function startStroke(x, y) {
+  if (!isLocalDrawer()) return;
+
   const { color, width } = currentStyle();
   const strokeId = `${Date.now()}-${++nextStrokeId}`;
   const firstPoint = { color, width, x, y, erase: isErasing };
@@ -149,7 +151,7 @@ export function startStroke(x, y) {
 
 // drawing sequence
 export function moveStroke(x, y) {
-  if (!isDrawing) return;
+  if (!isDrawing || !isLocalDrawer()) return;
 
   const { color, width } = currentStyle();
   const stroke = strokes[strokes.length - 1];

@@ -15,6 +15,7 @@
           <canvas id="landmarks" width="640" height="480"></canvas>
           <canvas id="canvas" width="640" height="480"></canvas>
         </div>
+        <video id="remote-webcam" class="remote-video" autoplay playsinline muted></video>
 
         <div id="pointer-effects" aria-hidden="true">
           <span class="trail-dot"></span>
@@ -54,6 +55,8 @@
       <label>Your ID <code id="my-id">Connecting...</code></label>
       <input id="peer-id" placeholder="Other peer ID" aria-label="Other peer ID">
       <button id="connect-btn" type="button">Connect</button>
+      <span id="role-status" role="status">Waiting for peer</span>
+      <button id="pass-turn-btn" type="button" disabled>Pass turn</button>
       <span id="network-status" role="status">Starting PeerJS...</span>
     </div>
 
