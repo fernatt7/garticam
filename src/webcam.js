@@ -1,10 +1,15 @@
 import './style.css';
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
-import { canvas, endStroke, moveStroke, startStroke } from './draw';
+import { canvas, endStroke, moveStroke, startStroke, updateToolbarHover } from './draw.js';
 
 const video = document.querySelector('#webcam');
+const videoWrap = document.querySelector('.video-wrap');
 const landmarkCanvas = document.querySelector('#landmarks');
 const landmarkContext = landmarkCanvas?.getContext('2d');
+const pointerEffects = document.querySelector('#pointer-effects');
+const fingerGlow = pointerEffects?.querySelector('.finger-glow');
+const trailDots = pointerEffects ? [...pointerEffects.querySelectorAll('.trail-dot')] : [];
+const modeStatus = document.querySelector('#mode-status');
 const MAX_LOST = 3;
 const handConnections = [
   [0, 1], [1, 2], [2, 3], [3, 4],
@@ -17,69 +22,164 @@ const handConnections = [
 
 let handLandmarker = undefined;
 let isDrawing = false;
+let drawingPaused = false;
 let smoothX = null;
 let smoothY = null;
 let lostFrames = 0;
+let drawingReadyAt = null;
+let phoneGestureFrames = 0;
+let phoneGestureReleaseFrames = 0;
+let phoneGestureLatched = false;
+let lastVideoTime = -1;
+let lastTrailPoint = null;
+let lastTrailTime = 0;
 
-function handleFingerDrawing(results) {
+function stopCurrentStroke() {
+  if (!isDrawing) return;
+  endStroke();
+  isDrawing = false;
+}
 
-  // no hand
-  if (!results || !results.landmarks || results.landmarks.length === 0) {
-    if (lostFrames >= MAX_LOST) {
-      if (isDrawing) {
-        isDrawing = false;
-        endStroke();
-      }
-    }
+function updateFingerIndicator(x, y, visible) {
+  if (!pointerEffects || !videoWrap || !fingerGlow) return;
 
-    smoothX = null;
-    smoothY = null;
-
+  if (!visible) {
+    pointerEffects.classList.remove('visible');
+    trailDots.forEach(dot => { dot.style.opacity = '0'; });
+    lastTrailPoint = null;
     return;
   }
+
+  const bounds = videoWrap.getBoundingClientRect();
+  const screenX = (x / canvas.width) * bounds.width;
+  const screenY = (y / canvas.height) * bounds.height;
+  pointerEffects.classList.add('visible');
+  fingerGlow.style.left = `${screenX}px`;
+  fingerGlow.style.top = `${screenY}px`;
+
+  const now = performance.now();
+  if (!lastTrailPoint || Math.hypot(screenX - lastTrailPoint.x, screenY - lastTrailPoint.y) > 5 || now - lastTrailTime > 70) {
+    for (let i = trailDots.length - 1; i > 0; i--) {
+      trailDots[i].style.left = trailDots[i - 1].style.left;
+      trailDots[i].style.top = trailDots[i - 1].style.top;
+      trailDots[i].style.opacity = String((trailDots.length - i) / (trailDots.length + 1) * 0.55);
+    }
+    trailDots[0].style.left = `${screenX}px`;
+    trailDots[0].style.top = `${screenY}px`;
+    trailDots[0].style.opacity = '0.48';
+    lastTrailPoint = { x: screenX, y: screenY };
+    lastTrailTime = now;
+  }
+}
+
+function distanceBetween(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function isPhoneGesture(hand) {
+  const wrist = hand[0];
+  const thumbExtended = distanceBetween(wrist, hand[4]) > distanceBetween(wrist, hand[2]) * 1.12;
+  const pinkyExtended = distanceBetween(wrist, hand[20]) > distanceBetween(wrist, hand[18]) * 1.15;
+  const indexCurled = distanceBetween(wrist, hand[8]) < distanceBetween(wrist, hand[6]) * 1.12;
+  const middleCurled = distanceBetween(wrist, hand[12]) < distanceBetween(wrist, hand[10]) * 1.12;
+  const ringCurled = distanceBetween(wrist, hand[16]) < distanceBetween(wrist, hand[14]) * 1.12;
+
+  return thumbExtended && pinkyExtended && indexCurled && middleCurled && ringCurled;
+}
+
+function setDrawingPaused(paused) {
+  drawingPaused = paused;
+  modeStatus.textContent = paused ? 'DRAWING PAUSED' : 'DRAWING ON';
+  stopCurrentStroke();
+  drawingReadyAt = null;
+}
+
+function handleFingerDrawing(results) {
+  // Missing hands end a stroke after a few frames to avoid brief tracking dropouts.
+  if (!results || !results.landmarks || results.landmarks.length === 0) {
+    lostFrames++;
+    drawingReadyAt = null;
+    updateToolbarHover(0, 0, false);
+    updateFingerIndicator(0, 0, false);
+
+    if (lostFrames >= MAX_LOST) {
+      stopCurrentStroke();
+    }
+    smoothX = null;
+    smoothY = null;
+    return;
+  }
+
   lostFrames = 0;
-
-  const width = video.videoWidth || canvas.width;
-  const height = video.videoHeight || canvas.height;
-
   const hand = results.landmarks[0];
-
   const wrist = hand[0];
   const indexTip = hand[8];
 
-  // ensure landmarks exist
   if (!indexTip || !wrist) {
-    if (isDrawing) {
-      endStroke();
-      isDrawing = false;
-    }
-
+    stopCurrentStroke();
+    drawingReadyAt = null;
+    updateToolbarHover(0, 0, false);
+    updateFingerIndicator(0, 0, false);
     smoothX = null;
     smoothY = null;
-
     return;
   }
 
-  const distanceFromWrist = Math.hypot(
-    indexTip.x - wrist.x,
-    indexTip.y - wrist.y
-  );
+  const phoneSign = isPhoneGesture(hand);
+  if (phoneSign) {
+    phoneGestureFrames++;
+    phoneGestureReleaseFrames = 0;
+  } else {
+    phoneGestureFrames = 0;
+    phoneGestureReleaseFrames++;
+    if (phoneGestureReleaseFrames >= 8) phoneGestureLatched = false;
+  }
 
-  // if index pointer is close to wrist, treat as closed fist and stop drawing
-  if (distanceFromWrist < 0.15) {
-    if (isDrawing) {
-      endStroke();
-      isDrawing = false;
-    }
+  if (phoneGestureFrames >= 6 && !phoneGestureLatched) {
+    phoneGestureLatched = true;
+    setDrawingPaused(!drawingPaused);
+  }
 
-    smoothX = null;
-    smoothY = null;
-
+  if (phoneSign) {
+    stopCurrentStroke();
+    drawingReadyAt = null;
+    updateToolbarHover(0, 0, false);
+    updateFingerIndicator((1 - indexTip.x) * canvas.width, indexTip.y * canvas.height, true);
     return;
   }
 
-  const x = width - (indexTip.x * width);
-  const y = indexTip.y * height;
+  const x = (1 - indexTip.x) * canvas.width;
+  const y = indexTip.y * canvas.height;
+  const indexIsExtended = distanceBetween(indexTip, wrist) >= 0.25;
+
+  updateFingerIndicator(x, y, true);
+  const bounds = videoWrap.getBoundingClientRect();
+  const clientX = bounds.left + (x / canvas.width) * bounds.width;
+  const clientY = bounds.top + (y / canvas.height) * bounds.height;
+  const hoveringToolbar = updateToolbarHover(clientX, clientY, indexIsExtended);
+
+  if (hoveringToolbar || drawingPaused) {
+    stopCurrentStroke();
+    drawingReadyAt = null;
+    smoothX = null;
+    smoothY = null;
+    return;
+  }
+
+  // delay after the pointing pose begins so pulling the finger out is not recorded.
+  if (!indexIsExtended) {
+    stopCurrentStroke();
+    drawingReadyAt = null;
+    smoothX = null;
+    smoothY = null;
+    return;
+  }
+
+  if (drawingReadyAt === null) {
+    drawingReadyAt = performance.now();
+    return;
+  }
+  if (performance.now() - drawingReadyAt < 40) return;
 
   // Smoothing
   if (smoothX === null) {
@@ -97,14 +197,9 @@ function handleFingerDrawing(results) {
     smoothY <= canvas.height;
 
   if (!insideCanvas) {
-    if (isDrawing) {
-      endStroke();
-      isDrawing = false;
-    }
-
+    stopCurrentStroke();
     smoothX = null;
     smoothY = null;
-
     return;
   }
 
@@ -128,11 +223,8 @@ function drawLandmarks(results) {
     return;
   }
 
-  const width = video.videoWidth || landmarkCanvas.width;
-  const height = video.videoHeight || landmarkCanvas.height;
-
-  landmarkCanvas.width = width;
-  landmarkCanvas.height = height;
+  const width = landmarkCanvas.width;
+  const height = landmarkCanvas.height;
 
   landmarkContext.strokeStyle = '#22c55e';
   landmarkContext.fillStyle = '#22c55e';
@@ -168,7 +260,7 @@ async function createHandLandmarker() {
       delegate: 'GPU'
     },
     runningMode: 'VIDEO',
-    numHands: 2
+    numHands: 1
   });
 }
 
@@ -177,13 +269,15 @@ function predictWebcam() {
     return;
   }
 
+  requestAnimationFrame(predictWebcam);
+  if (video.currentTime === lastVideoTime) return;
+  lastVideoTime = video.currentTime;
+
   const startTimeMs = performance.now();
   const results = handLandmarker.detectForVideo(video, startTimeMs);
 
-  drawLandmarks(results);
+  // drawLandmarks(results); // Keep the skeleton renderer available, but disabled for speed.
   handleFingerDrawing(results);
-
-  requestAnimationFrame(predictWebcam);
 }
 
 export async function startCamera() {

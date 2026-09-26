@@ -13,8 +13,11 @@ let eraseWidth = 10;
 let isErasing = false;
 let isDrawing = false;
 
-// strokes drawn for all drawing sequences
-const strokes = [];
+const strokes = []; // strokes drawn for all drawing sequences
+const toolbar = document.querySelector('.toolbar');
+let hoverTarget = null;
+let hoverStartedAt = 0;
+let hoverActivated = false;
 
 const getColor = el => el.type === 'color' ? el.value : el.style.backgroundColor;
 
@@ -33,18 +36,60 @@ penRange.addEventListener('input', (e) => {
     eraseWidth = Number(e.target.value);
 })
 
+function setBrushFromHover(range, clientX) {
+  const rect = range.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  const min = Number(range.min);
+  const max = Number(range.max);
+  const value = Math.round(min + ratio * (max - min));
+
+  if (Number(range.value) !== value) {
+    range.value = String(value);
+    range.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
+
+export function updateToolbarHover(clientX, clientY, enabled) {
+  if (!toolbar || !enabled) {
+    hoverTarget = null;
+    hoverActivated = false;
+    return false;
+  }
+
+  const element = document.elementFromPoint(clientX, clientY);
+  const target = element?.closest('.toolbar button, .toolbar .colorfield, .toolbar input[type="range"]');
+
+  if (!target || !toolbar.contains(target)) {
+    hoverTarget = null;
+    hoverActivated = false;
+    return false;
+  }
+
+  if (target !== hoverTarget) {
+    hoverTarget = target;
+    hoverStartedAt = performance.now();
+    hoverActivated = false;
+  }
+
+  const dwellComplete = performance.now() - hoverStartedAt >= 500;
+  if (dwellComplete && !hoverActivated) {
+    if (target.matches('input[type="range"]')) {
+      setBrushFromHover(target, clientX);
+    } else {
+      target.click();
+    }
+    hoverActivated = true;
+  } else if (dwellComplete && target.matches('input[type="range"]')) {
+    setBrushFromHover(target, clientX);
+  }
+
+  return true;
+}
+
 function currentStyle() {
   return isErasing
     ? { color: 'white', width: eraseWidth }
     : { color: drawColor, width: drawWidth };
-}
-
-function getMousePosition(e) {
-  const rect = canvas.getBoundingClientRect();
-  return {
-    x: (e.clientX - rect.left) * (canvas.width / rect.width),
-    y: (e.clientY - rect.top) * (canvas.height / rect.height)
-  };
 }
 
 // start drawing sequence
@@ -84,22 +129,8 @@ export function endStroke() {
   ctx.globalCompositeOperation = 'source-over';
 }
 
-canvas.addEventListener('mousedown', (e) => {
-  const { x, y } = getMousePosition(e);
-  startStroke(x, y);
-});
 
-canvas.addEventListener('mousemove', (e) => {
-  if (!isDrawing) return;
-
-  const { x, y } = getMousePosition(e);
-  moveStroke(x, y);
-});
-
-canvas.addEventListener('mouseup', endStroke);
-canvas.addEventListener('mouseout', endStroke);
-
-// redraw every stored stroke from scratch while preserving colors (for undo)
+// redraw every stored stroke while preserving colors (for undo)
 function redrawAll() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
