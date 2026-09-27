@@ -112,17 +112,22 @@ function beginTurn(drawerId, nextTurnNumber = turnNumber + 1) {
   }
 
   turnsPlayed++;
-  const endsAt = Date.now() + turnDurationMs;
-  setDrawerPeer(drawerId, nextTurnNumber, endsAt);
+  setDrawerPeer(drawerId, nextTurnNumber, 0); // 0 = timer not started yet
   conn.send({
     type: 'turn-change',
     drawerPeerId: drawerId,
     turnNumber: nextTurnNumber,
-    turnEndsAt: endsAt,
+    turnEndsAt: 0,
     turnsPlayed,
     turnDurationMs,
     roundsPerPlayer
   });
+}
+
+export function confirmTopicReady() {
+  if (!conn?.open || !localIsConnector || !drawerPeerId || turnEndsAt) return;
+  turnEndsAt = Date.now() + turnDurationMs;
+  conn.send({ type: 'turn-timer-start', turnEndsAt });
 }
 
 function finishGame(scores = latestScores, receivedFromPeer = false) {
@@ -342,6 +347,7 @@ function handleStrokeMessage(message, sourcePeerId) {
     if (currentDrawer || previousDrawer) {
       window.dispatchEvent(new CustomEvent(`garticam:${message.type}`, { detail: message }));
     }
+    if (currentDrawer && message.type === 'game-round-ready') confirmTopicReady();
     return;
   }
 

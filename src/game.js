@@ -1,4 +1,4 @@
-import { getPeerIds, leaveRoom, requestPlayAgain, requestTurnPass, sendGameMessage } from './network.js';
+import { getPeerIds, leaveRoom, requestPlayAgain, requestTurnPass, sendGameMessage, confirmTopicReady } from './network.js';
 
 const room = document.querySelector('#app');
 const startScreen = document.querySelector('#start-screen');
@@ -170,7 +170,8 @@ function startSolo() {
   topicReady = false;
   roundSolved = false;
   scores = {};
-  room.classList.add('is-solo');
+  room.classList.add('is-solo', 'is-drawer');
+  room.classList.remove('is-guesser', 'is-waiting');
   showGame();
   topicPicker.hidden = true;
   topicCard.hidden = true;
@@ -295,6 +296,7 @@ function selectTopic(index) {
   topicPicker.hidden = true;
   setGuessEnabled();
   sendGameMessage({ type: 'game-round-ready' });
+  confirmTopicReady();
 }
 
 export function updateTopicHover(clientX, clientY, enabled) {
