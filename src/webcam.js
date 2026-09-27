@@ -376,7 +376,8 @@ export async function startCamera() {
         width: { ideal: 1280 },
         height: { ideal: 960 },
         aspectRatio: { ideal: 4 / 3 }
-      }
+      },
+      audio : true
     });
     video.srcObject = stream;
     setLocalStream(stream);

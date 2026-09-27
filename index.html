@@ -86,7 +86,7 @@
       <section class="stage-column">
         <div class="video-wrap">
           <div class="camera-source">
-            <video id="remote-stage-webcam" autoplay playsinline muted></video>
+            <video id="remote-stage-webcam" autoplay playsinline></video>
             <video id="webcam" autoplay playsinline></video>
             <canvas id="landmarks" width="640" height="480"></canvas>
             <canvas id="canvas" width="640" height="480"></canvas>
@@ -148,6 +148,7 @@
           </form>
         </section>
         <section class="game-controls">
+          <button id="mute-btn" aria-pressed="false">Mute</button>
           <button id="stage-view-toggle" type="button" aria-pressed="false">Canvas only</button>
           <button id="landmark-toggle" type="button" aria-pressed="false">Landmarks off</button>
           <button id="pass-turn-btn" type="button" disabled>End turn</button>

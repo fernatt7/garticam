@@ -27,6 +27,7 @@ const remotePlayerLabel = document.querySelector('#remote-webcam + span');
 const stageViewToggle = document.getElementById('stage-view-toggle');
 const turnTimer = document.getElementById('turn-timer');
 const passTurnButton = document.getElementById('pass-turn-btn');
+const muteButton = document.getElementById('mute-btn');
 
 let conn = null;
 let localStream = null;
@@ -46,6 +47,7 @@ let roundsPerPlayer = 3;
 let turnsPlayed = 0;
 let nextMessageId = 0;
 let latestScores = {};
+let isMuted = false;
 
 function setStatus(message) {
   if (networkStatus) networkStatus.textContent = message;
@@ -239,6 +241,7 @@ function startMediaCall() {
 
 export function setLocalStream(stream) {
   localStream = stream;
+  localStream.getAudioTracks().forEach(track => { track.enabled = !isMuted; });
   localPreview.srcObject = stream;
   localPreview.play().catch((error) => console.warn('Local preview playback was blocked:', error));
 
@@ -465,6 +468,14 @@ stageViewToggle.addEventListener('click', () => {
   stageViewToggle.textContent = canvasOnly ? 'Show camera' : 'Canvas only';
 });
 
+muteButton.addEventListener('click', () => {
+  if (!localStream) return;
+  isMuted = !isMuted;
+  localStream.getAudioTracks().forEach(track => { track.enabled = !isMuted; });
+  muteButton.setAttribute('aria-pressed', String(isMuted));
+  muteButton.textContent = isMuted ? 'Unmute' : 'Mute';
+});
+
 export function isLocalDrawer() {
   return conn?.open ? drawerPeerId === peer.id : true;
 }
@@ -511,3 +522,4 @@ export function leaveRoom() {
   window.dispatchEvent(new CustomEvent('garticam:room-disconnected'));
   updateRoleUI();
 }
+
