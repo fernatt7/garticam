@@ -8,7 +8,81 @@
   </head>
   <body>
 
-    <main id="app" class="room">
+    <main id="app" class="room is-lobby">
+      <section id="start-screen" class="flow-screen">
+        <div class="flow-panel">
+          <span class="flow-eyebrow">GARTICAM ROOM</span>
+          <h1>Draw together</h1>
+          <label class="flow-field">Your name
+            <input id="username-input" maxlength="20" placeholder="Player" autocomplete="nickname">
+          </label>
+          <div class="readiness-list" aria-label="Startup checks">
+            <div><span id="camera-check" class="check-mark">...</span> Check camera</div>
+            <div><span id="tracking-check" class="check-mark">...</span> Check hand tracking</div>
+            <div><span id="network-check" class="check-mark">...</span> Check network <code id="my-id">Connecting...</code></div>
+          </div>
+          <div class="flow-actions">
+            <button id="create-room-btn" type="button" disabled>Create room</button>
+            <span class="join-divider">or join</span>
+            <input id="peer-id" placeholder="Room ID" aria-label="Room ID">
+            <button id="connect-btn" type="button" disabled>Join room</button>
+          </div>
+            <div class="start-secondary-actions">
+              <button id="solo-play-btn" class="secondary-action" type="button" disabled>Play solo</button>
+              <button id="help-open-btn" class="text-action" type="button">How to play</button>
+            </div>
+          <p id="start-status" role="status">Loading Garticam...</p>
+            <p id="startup-network-status" class="start-network-status" role="status">Connecting to network...</p>
+        </div>
+        <dialog id="help-dialog" class="help-dialog">
+          <form method="dialog">
+            <button class="dialog-close" aria-label="Close help">×</button>
+          </form>
+          <span class="flow-eyebrow">QUICK FIELD GUIDE</span>
+          <h2>How to play</h2>
+          <ul>
+            <li><strong>Draw:</strong> point with your index finger. Keep it extended briefly to begin a line.</li>
+            <li><strong>Pause a stroke:</strong> pinch your thumb and index finger together. Release to continue with a fresh segment.</li>
+            <li><strong>Pause drawing:</strong> make the phone-call hand sign to toggle drawing mode off or on.</li>
+            <li><strong>Use the toolbar:</strong> hover your fingertip over a tool for a moment, or use a mouse or touchscreen.</li>
+            <li><strong>Canvas only:</strong> switch between the drawing board alone and the camera with the drawing overlaid.</li>
+            <li><strong>Landmarks:</strong> turn the hand skeleton overlay on or off for tracking checks.</li>
+            <li><strong>Multiplayer:</strong> the drawer sees a secret word; the guesser submits guesses in chat. Take turns before the timer ends.</li>
+          </ul>
+        </dialog>
+      </section>
+
+      <section id="leader-lobby" class="flow-screen" hidden>
+        <div class="flow-panel lobby-panel">
+          <span class="flow-eyebrow">ROOM LOBBY</span>
+          <h2 id="lobby-heading">Waiting for players</h2>
+          <p id="lobby-room-id">Share your room ID with a friend.</p>
+          <div class="lobby-settings">
+            <label id="turn-setting-label">Turn length
+              <div class="stepper-field"><input id="turn-length-input" type="number" min="45" max="300" step="15" value="60"><span>seconds</span></div>
+            </label>
+            <label id="round-setting-label">Rounds per player
+              <div class="stepper-field"><input id="rounds-input" type="number" min="1" max="10" step="1" value="3"><span>rounds</span></div>
+            </label>
+          </div>
+          <p id="lobby-status" role="status">Connect a player to continue.</p>
+          <button id="start-game-btn" type="button" disabled>Start game</button>
+        </div>
+      </section>
+
+      <section id="game-over-screen" class="flow-screen" hidden>
+        <div class="flow-panel results-panel">
+          <span class="flow-eyebrow">GAME COMPLETE</span>
+          <h2>Final scores</h2>
+          <ol id="leaderboard"></ol>
+          <div class="flow-actions">
+            <button id="play-again-btn" type="button">Play again</button>
+            <button id="leave-room-btn" class="secondary-action" type="button">Leave room</button>
+          </div>
+          <p id="results-status" role="status"></p>
+        </div>
+      </section>
+
       <section class="stage-column">
         <div class="video-wrap">
           <div class="camera-source">
@@ -81,9 +155,7 @@
         <details class="connection-details">
           <summary>Connection</summary>
           <div class="connection-panel">
-            <label>Your ID <code id="my-id">Connecting...</code></label>
-            <input id="peer-id" placeholder="Other peer ID" aria-label="Other peer ID">
-            <button id="connect-btn" type="button">Connect</button>
+            <span>Room options appear before the game starts.</span>
             <span id="network-status" role="status">Starting PeerJS...</span>
           </div>
         </details>
@@ -93,10 +165,12 @@
         <article class="player-tile">
           <video id="local-preview" autoplay playsinline muted></video>
           <span>You</span>
+          <strong id="local-score-badge" class="player-score-badge">0 pts</strong>
         </article>
         <article class="player-tile">
           <video id="remote-webcam" autoplay playsinline muted></video>
           <span>Other player</span>
+          <strong id="remote-score-badge" class="player-score-badge">0 pts</strong>
         </article>
       </section>
     </main>

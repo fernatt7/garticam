@@ -381,6 +381,7 @@ export async function startCamera() {
     video.srcObject = stream;
     setLocalStream(stream);
     await video.play();
+    window.dispatchEvent(new CustomEvent('garticam:camera-ready'));
 
     const captureSettings = stream.getVideoTracks()[0]?.getSettings();
     console.info('Webcam capture:', captureSettings?.width, 'x', captureSettings?.height);
@@ -390,6 +391,7 @@ export async function startCamera() {
     }
 
     await createHandLandmarker();
+    window.dispatchEvent(new CustomEvent('garticam:tracking-ready'));
     predictWebcam();
   } catch (err) {
     if (err.name === 'NotFoundError') {
