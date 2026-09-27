@@ -380,6 +380,7 @@ export async function startCamera() {
       audio : true
     });
     video.srcObject = stream;
+    video.muted = true;
     setLocalStream(stream);
     await video.play();
     window.dispatchEvent(new CustomEvent('garticam:camera-ready'));

@@ -241,6 +241,7 @@ function startMediaCall() {
 
 export function setLocalStream(stream) {
   localStream = stream;
+  localPreview.muted = true;
   localStream.getAudioTracks().forEach(track => { track.enabled = !isMuted; });
   localPreview.srcObject = stream;
   localPreview.play().catch((error) => console.warn('Local preview playback was blocked:', error));
