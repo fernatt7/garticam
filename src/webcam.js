@@ -1,6 +1,7 @@
 import './style.css';
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 import { canvas, endStroke, moveStroke, startStroke, updateToolbarHover } from './draw.js';
+import { updateTopicHover } from './game.js';
 import { isLocalDrawer, setLocalStream } from './network.js';
 
 const video = document.querySelector('#webcam');
@@ -35,6 +36,14 @@ let phoneGestureLatched = false;
 let lastVideoTime = -1;
 let lastTrailPoint = null;
 let lastTrailTime = 0;
+let showLandmarks = false;
+
+landmarkCanvas.hidden = true;
+window.addEventListener('garticam:landmarks-toggle', (event) => {
+  showLandmarks = event.detail.show;
+  landmarkCanvas.hidden = !showLandmarks;
+  if (!showLandmarks) landmarkContext?.clearRect(0, 0, landmarkCanvas.width, landmarkCanvas.height);
+});
 
 function stopCurrentStroke() {
   if (!isDrawing) return;
@@ -122,6 +131,7 @@ function handleFingerDrawing(results) {
   if (!isLocalDrawer()) {
     stopCurrentStroke();
     drawingReadyAt = null;
+    updateToolbarHover(0, 0, false);
     updateFingerIndicator(0, 0, false);
     smoothX = null;
     smoothY = null;
@@ -215,6 +225,16 @@ function handleFingerDrawing(results) {
   const viewPoint = mapTrackingPointToView(x, y);
   const clientX = viewPoint.x;
   const clientY = viewPoint.y;
+  const selectingTopic = updateTopicHover(clientX, clientY, indexIsExtended);
+  if (selectingTopic) {
+    stopCurrentStroke();
+    drawingReadyAt = null;
+    updateToolbarHover(0, 0, false);
+    updateFingerIndicator(0, 0, false);
+    smoothX = null;
+    smoothY = null;
+    return;
+  }
   const hoveringToolbar = updateToolbarHover(clientX, clientY, true);
 
   if (hoveringToolbar || drawingPaused) {
@@ -340,6 +360,7 @@ function predictWebcam() {
   const startTimeMs = performance.now();
   const results = handLandmarker.detectForVideo(video, startTimeMs);
 
+  if (showLandmarks) drawLandmarks(results);
   handleFingerDrawing(results);
 }
 

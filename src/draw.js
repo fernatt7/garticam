@@ -79,7 +79,7 @@ export function updateToolbarHover(clientX, clientY, enabled) {
   }
 
   const element = document.elementFromPoint(clientX, clientY);
-  const target = element?.closest('.toolbar button, .toolbar .colorfield, .toolbar input[type="range"]');
+  const target = element?.closest('.toolbar button:not(#landmark-toggle), .toolbar .colorfield, .toolbar input[type="range"]');
 
   if (!target || !toolbar.contains(target)) {
     hoverTarget?.classList.remove('gaze-hover');
@@ -99,7 +99,7 @@ export function updateToolbarHover(clientX, clientY, enabled) {
   }
 
   const now = performance.now();
-  const dwellComplete = now - hoverStartedAt >= 500;
+  const dwellComplete = now - hoverStartedAt >= 250;
   if (dwellComplete && !hoverActivated) {
     if (target.matches('input[type="range"]')) {
       setBrushFromHover(target, clientX);
@@ -107,14 +107,14 @@ export function updateToolbarHover(clientX, clientY, enabled) {
       target.click();
     }
     hoverActivated = true;
-    if (target.id === 'undo') nextUndoAt = now + 500;
+    if (target.id === 'undo') nextUndoAt = now + 250;
   } else if (dwellComplete && target.matches('input[type="range"]')) {
     setBrushFromHover(target, clientX);
   }
 
   if (target.id === 'undo' && hoverActivated && now >= nextUndoAt) {
     undoStroke();
-    nextUndoAt = now + 500;
+    nextUndoAt = now + 250;
   }
 
   return true;
@@ -171,6 +171,11 @@ export function endStroke() {
   isDrawing = false;
   ctx.globalCompositeOperation = 'source-over';
 }
+
+window.addEventListener('garticam:before-turn-change', endStroke);
+window.addEventListener('garticam:role-changed', (event) => {
+  if (!event.detail.isDrawer) endStroke();
+});
 
 function drawDot(point) {
   ctx.save();
@@ -263,16 +268,41 @@ function redrawAll() {
 
 const clear = document.querySelector('#clear');
 clear.addEventListener('click', () => {
+  if (!isLocalDrawer()) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   strokes.length = 0;
+  remoteStrokes.length = 0;
+  activeRemoteStrokes.clear();
+  sendStrokeEvent({ type: 'canvas-clear' });
 });
 
 const undo = document.querySelector('#undo');
 function undoStroke() {
+  if (!isLocalDrawer()) return;
   strokes.pop();
   redrawAll();
+  sendStrokeEvent({ type: 'canvas-undo' });
 }
 undo.addEventListener('click', undoStroke);
+
+window.addEventListener('garticam:remote-canvas-control', (event) => {
+  if (event.detail.type === 'canvas-clear') {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    strokes.length = 0;
+    remoteStrokes.length = 0;
+    activeRemoteStrokes.clear();
+  } else if (event.detail.type === 'canvas-undo') {
+    remoteStrokes.pop();
+    redrawAll();
+  }
+});
+
+window.addEventListener('garticam:turn-changed', () => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  strokes.length = 0;
+  remoteStrokes.length = 0;
+  activeRemoteStrokes.clear();
+});
 
 const eraser = document.querySelector('#eraser');
 eraser.addEventListener('click', () => {

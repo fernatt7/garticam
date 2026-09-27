@@ -8,57 +8,98 @@
   </head>
   <body>
 
-    <div id="app" class="container">
-      <div class="video-wrap">
-        <div class="camera-source">
-          <video id="webcam" autoplay playsinline></video>
-          <canvas id="landmarks" width="640" height="480"></canvas>
-          <canvas id="canvas" width="640" height="480"></canvas>
+    <main id="app" class="room">
+      <section class="stage-column">
+        <div class="video-wrap">
+          <div class="camera-source">
+            <video id="remote-stage-webcam" autoplay playsinline muted></video>
+            <video id="webcam" autoplay playsinline></video>
+            <canvas id="landmarks" width="640" height="480"></canvas>
+            <canvas id="canvas" width="640" height="480"></canvas>
+          </div>
+
+          <div id="topic-card" class="topic-card" hidden>
+            <strong id="topic-word">...</strong>
+          </div>
+
+          <section id="topic-picker" class="topic-picker" hidden>
+            <span class="sidebar-label">HOVER TO PICK A TOPIC</span>
+            <div id="topic-options" class="topic-options"></div>
+          </section>
+
+          <div id="pointer-effects" aria-hidden="true">
+            <span class="trail-dot"></span>
+            <span class="trail-dot"></span>
+            <span class="trail-dot"></span>
+            <span class="trail-dot"></span>
+            <span class="trail-dot"></span>
+            <span class="trail-dot"></span>
+            <span class="finger-glow"></span>
+          </div>
+
+          <div id="mode-status" aria-live="polite">DRAWING ON</div>
+          <span id="turn-timer" aria-label="Time remaining">--:--</span>
+          <div id="tool-status" aria-live="polite">
+            <span id="tool-color" aria-hidden="true"></span>
+            <span id="tool-color-name">Color: black</span>
+            <span id="tool-width">Width: 5 px</span>
+          </div>
+
+          <div class="toolbar">
+            <button id="undo" type="button">Undo</button>
+            <button id="clear" type="button">Clear</button>
+            <button id="eraser" type="button">Eraser</button>
+            <div class="colorfield" style="background: black;"></div>
+            <div class="colorfield" style="background: red;"></div>
+            <div class="colorfield" style="background: green;"></div>
+            <div class="colorfield" style="background: blue;"></div>
+            <div class="colorfield" style="background: yellow;"></div>
+            <input class="colorfield" type="color" aria-label="Choose drawing color">
+            <input id="widthRange" type="range" min="2" max="40" value="5" aria-label="Brush size">
+          </div>
         </div>
-        <video id="remote-webcam" class="remote-video" autoplay playsinline muted></video>
 
-        <div id="pointer-effects" aria-hidden="true">
-          <span class="trail-dot"></span>
-          <span class="trail-dot"></span>
-          <span class="trail-dot"></span>
-          <span class="trail-dot"></span>
-          <span class="trail-dot"></span>
-          <span class="trail-dot"></span>
-          <span class="finger-glow"></span>
-        </div>
+      </section>
 
-        <div id="mode-status" aria-live="polite">DRAWING ON</div>
-        <div id="tool-status" aria-live="polite">
-          <span id="tool-color" aria-hidden="true"></span>
-          <span id="tool-color-name">Color: black</span>
-          <span id="tool-width">Width: 5 px</span>
-        </div>
+      <aside class="participant-sidebar">
+        <section class="chat-panel">
+          <header class="chat-header">
+            <span class="sidebar-label">GUESSES</span>
+            <span id="score-readout">You 0 · Other 0</span>
+          </header>
+          <ol id="chat-messages" aria-live="polite"></ol>
+          <form id="guess-form">
+            <input id="guess-input" autocomplete="off" placeholder="Type a guess" aria-label="Your guess">
+            <button id="guess-send" type="submit">Guess</button>
+          </form>
+        </section>
+        <section class="game-controls">
+          <button id="stage-view-toggle" type="button" aria-pressed="false">Canvas only</button>
+          <button id="landmark-toggle" type="button" aria-pressed="false">Landmarks off</button>
+          <button id="pass-turn-btn" type="button" disabled>End turn</button>
+        </section>
+        <details class="connection-details">
+          <summary>Connection</summary>
+          <div class="connection-panel">
+            <label>Your ID <code id="my-id">Connecting...</code></label>
+            <input id="peer-id" placeholder="Other peer ID" aria-label="Other peer ID">
+            <button id="connect-btn" type="button">Connect</button>
+            <span id="network-status" role="status">Starting PeerJS...</span>
+          </div>
+        </details>
+      </aside>
 
-        <div class="toolbar">
-          <button id="undo" type="button">Undo</button>
-          <button id="clear" type="button">Clear</button>
-          <button id="eraser" type="button">Eraser</button>
-
-          <div class="colorfield" style="background: black;"></div>
-          <div class="colorfield" style="background: red;"></div>
-          <div class="colorfield" style="background: green;"></div>
-          <div class="colorfield" style="background: blue;"></div>
-          <div class="colorfield" style="background: yellow;"></div>
-
-          <input class="colorfield" type="color" aria-label="Choose drawing color">
-          <input id="widthRange" type="range" min="2" max="40" value="5" aria-label="Brush size">
-        </div>
-      </div>
-    </div>
-
-    <div class="network-panel">
-      <label>Your ID <code id="my-id">Connecting...</code></label>
-      <input id="peer-id" placeholder="Other peer ID" aria-label="Other peer ID">
-      <button id="connect-btn" type="button">Connect</button>
-      <span id="role-status" role="status">Waiting for peer</span>
-      <button id="pass-turn-btn" type="button" disabled>Pass turn</button>
-      <span id="network-status" role="status">Starting PeerJS...</span>
-    </div>
+      <section id="player-strip" class="player-strip" aria-label="Players">
+        <article class="player-tile">
+          <video id="local-preview" autoplay playsinline muted></video>
+          <span>You</span>
+        </article>
+        <article class="player-tile">
+          <video id="remote-webcam" autoplay playsinline muted></video>
+          <span>Other player</span>
+        </article>
+      </section>
+    </main>
 
     <script type="module" src="/src/main.js"></script>
   </body>

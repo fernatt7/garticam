@@ -7,16 +7,25 @@ const peerIdInput = document.getElementById('peer-id');
 const connectButton = document.getElementById('connect-btn');
 const passTurnButton = document.getElementById('pass-turn-btn');
 const networkStatus = document.getElementById('network-status');
-const roleStatus = document.getElementById('role-status');
 const remoteVideo = document.getElementById('remote-webcam');
+const remoteStageVideo = document.getElementById('remote-stage-webcam');
+const localPreview = document.getElementById('local-preview');
+const room = document.getElementById('app');
+const stageViewToggle = document.getElementById('stage-view-toggle');
+const turnTimer = document.getElementById('turn-timer');
+const TURN_DURATION_MS = 60_000;
 
 let conn = null;
 let localStream = null;
 let mediaCall = null;
 let localIsConnector = false;
 let drawerPeerId = null;
+let previousDrawerPeerId = null;
+let previousTurnNumber = 0;
 let turnNumber = 0;
 let nextMessageId = 0;
+let turnEndsAt = 0;
+let turnClock = null;
 
 function setStatus(message) {
   if (networkStatus) networkStatus.textContent = message;
@@ -26,30 +35,76 @@ function updateRoleUI() {
   const connected = Boolean(conn?.open && drawerPeerId);
   const isDrawer = connected && drawerPeerId === peer.id;
 
-  if (roleStatus) {
-    roleStatus.textContent = !connected ? 'Waiting for peer' : isDrawer ? 'Your turn: Drawer' : 'Your turn: Guesser';
-  }
+  room?.classList.toggle('is-drawer', connected && isDrawer);
+  room?.classList.toggle('is-guesser', connected && !isDrawer);
+  room?.classList.toggle('is-waiting', !connected);
   if (passTurnButton) {
     passTurnButton.disabled = !connected;
     passTurnButton.textContent = isDrawer ? 'Pass turn' : 'Become drawer';
   }
 
-  window.dispatchEvent(new CustomEvent('garticam:role-changed', { detail: { isDrawer } }));
+  if (stageViewToggle) {
+    stageViewToggle.hidden = !connected;
+    stageViewToggle.setAttribute('aria-pressed', String(room?.classList.contains('canvas-only') ?? false));
+    stageViewToggle.textContent = room?.classList.contains('canvas-only') ? 'Show camera' : 'Canvas only';
+  }
+  window.dispatchEvent(new CustomEvent('garticam:role-changed', {
+    detail: { isDrawer, connected, turnNumber, turnEndsAt }
+  }));
 }
 
-function setDrawerPeer(id, newTurnNumber = turnNumber) {
+function setDrawerPeer(id, newTurnNumber = turnNumber, newTurnEndsAt = turnEndsAt) {
   if (id !== peer.id && id !== conn?.peer) return;
   if (newTurnNumber < turnNumber) return;
 
+  const isNewTurn = newTurnNumber > turnNumber;
+  if (isNewTurn) {
+    window.dispatchEvent(new CustomEvent('garticam:before-turn-change'));
+    previousDrawerPeerId = drawerPeerId;
+    previousTurnNumber = turnNumber;
+  }
   turnNumber = newTurnNumber;
+  turnEndsAt = newTurnEndsAt;
   drawerPeerId = id;
   updateRoleUI();
+  if (isNewTurn) {
+    window.dispatchEvent(new CustomEvent('garticam:turn-changed', { detail: { turnNumber, turnEndsAt } }));
+  }
 }
 
+function beginTurn(drawerId, nextTurnNumber = turnNumber + 1) {
+  if (!conn?.open) return;
+  const endsAt = Date.now() + TURN_DURATION_MS;
+  setDrawerPeer(drawerId, nextTurnNumber, endsAt);
+  conn.send({ type: 'turn-change', drawerPeerId: drawerId, turnNumber: nextTurnNumber, turnEndsAt: endsAt });
+}
+
+function updateTurnClock() {
+  const connected = Boolean(conn?.open && turnEndsAt);
+  const remainingSeconds = connected ? Math.max(0, Math.ceil((turnEndsAt - Date.now()) / 1000)) : null;
+  if (turnTimer) turnTimer.textContent = remainingSeconds === null
+    ? '--:--'
+    : `${Math.floor(remainingSeconds / 60)}:${String(remainingSeconds % 60).padStart(2, '0')}`;
+
+  if (localIsConnector && connected && remainingSeconds === 0) {
+    beginTurn(drawerPeerId === peer.id ? conn.peer : peer.id);
+  }
+}
+
+if (!turnClock) turnClock = setInterval(updateTurnClock, 250);
+
 function setRemoteStream(stream) {
-  if (!remoteVideo) return;
-  remoteVideo.srcObject = stream;
-  remoteVideo.play().catch((error) => console.warn('Remote video playback was blocked:', error));
+  [remoteVideo, remoteStageVideo].forEach((videoElement) => {
+    if (!videoElement) return;
+    videoElement.srcObject = stream;
+    videoElement.play().catch((error) => console.warn('Remote video playback was blocked:', error));
+  });
+}
+
+function clearRemoteStream() {
+  [remoteVideo, remoteStageVideo].forEach((videoElement) => {
+    if (videoElement) videoElement.srcObject = null;
+  });
 }
 
 function answerPendingCall(call) {
@@ -59,7 +114,7 @@ function answerPendingCall(call) {
   call.on('stream', setRemoteStream);
   call.on('close', () => {
     if (mediaCall === call) mediaCall = null;
-    if (remoteVideo) remoteVideo.srcObject = null;
+    clearRemoteStream();
   });
   call.on('error', (error) => {
     console.error('Peer media error:', error);
@@ -75,7 +130,7 @@ function startMediaCall() {
 
   mediaCall.on('stream', setRemoteStream);
   mediaCall.on('close', () => {
-    if (remoteVideo) remoteVideo.srcObject = null;
+    clearRemoteStream();
     mediaCall = null;
   });
   mediaCall.on('error', (error) => {
@@ -86,6 +141,10 @@ function startMediaCall() {
 
 export function setLocalStream(stream) {
   localStream = stream;
+  if (localPreview) {
+    localPreview.srcObject = stream;
+    localPreview.play().catch((error) => console.warn('Local preview playback was blocked:', error));
+  }
   if (conn?.open && !localIsConnector && pendingIncomingCall) {
     answerPendingCall(pendingIncomingCall);
     pendingIncomingCall = null;
@@ -112,7 +171,47 @@ function handleStrokeMessage(message, sourcePeerId) {
 
   if (message.type === 'room-state' || message.type === 'turn-change') {
     if (typeof message.drawerPeerId === 'string' && Number.isInteger(message.turnNumber)) {
-      setDrawerPeer(message.drawerPeerId, message.turnNumber);
+      setDrawerPeer(message.drawerPeerId, message.turnNumber, message.turnEndsAt);
+    }
+    return;
+  }
+
+  if (message.type === 'turn-pass-request') {
+    if (localIsConnector && sourcePeerId === conn?.peer) {
+      beginTurn(drawerPeerId === peer.id ? conn.peer : peer.id);
+    }
+    return;
+  }
+
+  if (message.type === 'game-guess') {
+    if (isLocalDrawer() && sourcePeerId !== peer.id && typeof message.text === 'string') {
+      window.dispatchEvent(new CustomEvent('garticam:incoming-guess', {
+        detail: { text: message.text, fromPeerId: sourcePeerId }
+      }));
+    }
+    return;
+  }
+
+  if (message.type === 'game-round-ready' || message.type === 'game-round-end') {
+    const isCurrentDrawer = sourcePeerId === drawerPeerId;
+    const isPreviousTurnDrawer = message.type === 'game-round-end' &&
+      sourcePeerId === previousDrawerPeerId && message.turnNumber === previousTurnNumber;
+    if (isCurrentDrawer || isPreviousTurnDrawer) {
+      window.dispatchEvent(new CustomEvent(`garticam:${message.type}`, { detail: message }));
+    }
+    return;
+  }
+
+  if (message.type === 'game-public-guess') {
+    if (sourcePeerId === drawerPeerId) {
+      window.dispatchEvent(new CustomEvent('garticam:public-guess', { detail: message }));
+    }
+    return;
+  }
+
+  if (message.type === 'canvas-clear' || message.type === 'canvas-undo') {
+    if (sourcePeerId === drawerPeerId && sourcePeerId !== peer.id) {
+      window.dispatchEvent(new CustomEvent('garticam:remote-canvas-control', { detail: message }));
     }
     return;
   }
@@ -143,8 +242,9 @@ function setConnection(connection, isOutgoing) {
   connection.on('open', () => {
     setStatus(`Connected to ${connection.peer}`);
     if (isOutgoing) {
-      setDrawerPeer(peer.id, 1);
-      connection.send({ type: 'room-state', drawerPeerId: peer.id, turnNumber: 1 });
+      turnEndsAt = Date.now() + TURN_DURATION_MS;
+      setDrawerPeer(peer.id, 1, turnEndsAt);
+      connection.send({ type: 'room-state', drawerPeerId: peer.id, turnNumber: 1, turnEndsAt });
       startMediaCall();
     } else if (pendingIncomingCall && localStream) {
       answerPendingCall(pendingIncomingCall);
@@ -158,12 +258,13 @@ function setConnection(connection, isOutgoing) {
     if (conn !== connection) return;
     conn = null;
     drawerPeerId = null;
+    turnEndsAt = 0;
     localIsConnector = false;
     if (mediaCall) {
       mediaCall.close();
       mediaCall = null;
     }
-    if (remoteVideo) remoteVideo.srcObject = null;
+    clearRemoteStream();
     setStatus('Peer disconnected');
     updateRoleUI();
   });
@@ -204,17 +305,38 @@ peer.on('error', (error) => {
 
 passTurnButton?.addEventListener('click', () => {
   if (!conn?.open) return;
-  const nextDrawerId = drawerPeerId === peer.id ? conn.peer : peer.id;
-  const nextTurnNumber = turnNumber + 1;
-  setDrawerPeer(nextDrawerId, nextTurnNumber);
-  conn.send({ type: 'turn-change', drawerPeerId: nextDrawerId, turnNumber: nextTurnNumber });
+  if (localIsConnector) beginTurn(drawerPeerId === peer.id ? conn.peer : peer.id);
+  else conn.send({ type: 'turn-pass-request' });
+});
+
+stageViewToggle?.addEventListener('click', () => {
+  if (!conn?.open) return;
+  const canvasOnly = room.classList.toggle('canvas-only');
+  stageViewToggle.setAttribute('aria-pressed', String(canvasOnly));
+  stageViewToggle.textContent = canvasOnly ? 'Show camera' : 'Canvas only';
 });
 
 export function isLocalDrawer() {
-  return !conn?.open || drawerPeerId === peer.id;
+  return conn?.open ? drawerPeerId === peer.id : true;
 }
 
 export function sendStrokeEvent(message) {
   if (!isLocalDrawer() || !conn?.open) return;
   conn.send({ ...message, messageId: ++nextMessageId });
+}
+
+export function sendGameMessage(message) {
+  if (!conn?.open) return false;
+  conn.send({ ...message, messageId: ++nextMessageId });
+  return true;
+}
+
+export function getPeerIds() {
+  return { localPeerId: peer.id, otherPeerId: conn?.peer ?? null };
+}
+
+export function requestTurnPass() {
+  if (!conn?.open) return;
+  if (localIsConnector) beginTurn(drawerPeerId === peer.id ? conn.peer : peer.id);
+  else conn.send({ type: 'turn-pass-request' });
 }
