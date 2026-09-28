@@ -1,10 +1,10 @@
 # GartiCam
 
-A Gartic Phone / Pictionary-style drawing-and-guessing game — except instead of drawing with a mouse, you draw **in the air**. A webcam tracks your fingertip in real time and turns its movement into strokes on a shared canvas, played live to the other player.
+Pictionary-style drawing-and-guessing game — except instead of drawing with a mouse, you draw **in the air**. A webcam tracks your fingertip in real time and turns its movement into strokes on a shared canvas, played live to the other player.
 
 Built as a CS50x final project.
 
-**Demo Video: https://garticam.vercel.app/**
+**Demo Video: https://youtu.be/v_WAHYQ5EKg**
 
 **Live at [garticam.vercel.app](https://garticam.vercel.app/)**
 
@@ -70,11 +70,11 @@ This was also a deliberate step up in difficulty for me. After finishing CS50x, 
 
 ## How This Was Built
 
-I want to be upfront: I didn't build all of this alone. I designed and implemented the core of the project myself — the drawing system, the fingertip-to-canvas mapping, the basic game loop, and the overall structure. But partway through, a few pieces got disproportionately hard to build solo — what should've been small changes were eating hours before debugging even started — so I leaned heavily on AI for parts like toolbar hover, the phone-gesture, debugging the networking and game logic, and refining code I'd already written. CSS in particular is close to entirely AI-written since i really have no interest looking at properties and tweaking them.
+I want to be upfront: I didn't build all of this alone. I designed and implemented the core of the project myself — the drawing system, the fingertip-to-canvas mapping, the basic game loop, and the overall structure. But partway through, a few pieces got disproportionately hard to build solo — what should've been small changes were eating hours before debugging even started — so I leaned heavily on AI for parts like toolbar hover, pointer glow effect, the phone-gesture, debugging the networking and game logic, and refining code I'd already written. CSS in particular is close to entirely AI-written since i really have no interest looking at properties and tweaking them.
 
 I've built a website for pset before and used the CSS there as a reference for the AI to work on **[PHANSITE](https://github.com/code50/284684434/tree/main/Week8/homepage)**
 
-This is also my first real project on GitHub, so the commit history isn't the cleanest — messages don't always match what actually changed since I often forgot to add new files, and I was still figuring out how often to commit and push as I went.
+This is also my first real project on GitHub, so the commit history isn't the cleanest — messages don't always match what actually changed since I often forgot to add new files, and I was still figuring out how often to commit as I went.
 
 ## Final Thoughts
 
